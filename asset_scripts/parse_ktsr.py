@@ -3,7 +3,7 @@ import struct
 from pathlib import Path
 from Crypto.Cipher import Blowfish
 
-EXTRACT_FILES = False
+EXTRACT_FILES = True
 
 def get_base_ktsr_pos(f):
     f.seek(0, 0)
@@ -41,10 +41,15 @@ ENCRYPTED_STREAMS = {}
 def build_encrypted_streams():
     in_path = Path.cwd()
 
-    files = list(Path.glob(in_path, "*.file"))
-    files.extend(list(Path.glob(in_path.parent / "enUS" / "data", "*.file")))
+    files = list(Path.rglob(in_path, "*.file"))
+
+    #for file in files:
+    #    print(file)
+    #exit()
 
     for file in files:
+        if file.stat().st_size < 0x30:
+            continue
         with open(file, "rb") as f:
             base_pos = get_base_ktsr_pos(f)
             pos = base_pos
@@ -73,6 +78,9 @@ def build_encrypted_streams():
                 pos += size
 
 
+    #for i,s in ENCRYPTED_STREAMS.items():
+    #    if "DLC" in str(s["file"]):
+    #        print(hex(i), s)
     #print(ENCRYPTED_STREAMS)
     #exit()
 
@@ -103,10 +111,8 @@ in_path = Path(sys.argv[1])
 if not in_path.is_file():
     files = [f for f in in_path.glob("*.asrs")]
     files.extend([f for f in in_path.glob("*.file")])
-    out_path = in_path
 else:
     files = [in_path]
-    out_path = in_path.parent
 
 for file in files:
     print(f"Parsing {file}")
@@ -243,6 +249,15 @@ for file in files:
                                     channel_offset += sub_pos
                                     print(f"\t\t{i}: channel_offset 0x{channel_offset:X} channel_size 0x{channel_size:X}")
 
+                                    if EXTRACT_FILES:
+                                        f.seek(channel_offset, 0)
+                                        channel_data = f.read(channel_size)
+
+                                        out_path = Path(str(file.with_suffix("")) + "_out")
+                                        out_path.mkdir(parents=True, exist_ok=True)
+                                        (out_path / f"{count}_{name}_ch{i}").write_bytes(channel_data)
+
+
                             case 0xA0F4FC6C | 0x793A1FD7:
                                 stream_sub_id = struct.unpack_from(">I", f.read(0x4))[0]
                                 num_channels = struct.unpack_from("<I", f.read(0x4))[0]
@@ -255,25 +270,26 @@ for file in files:
 
                                 print(f"\t{sub_count} at 0x{sub_pos:X} -- type 0x{sub_type:X} size 0x{sub_size:X} stream_sub_id 0x{stream_sub_id:X} num_channels 0x{num_channels:X} unk10 0x{unk10:X} fmt 0x{fmt:X} bps 0x{bps:X} sample_rate {sample_rate} num_samples 0x{num_samples:X} unk20 0x{unk20:X} loop_start {loop_start} channel_layout {channel_layout} unk2C 0x{unk2C:X} unk30 0x{unk30:X} unk3C 0x{unk3C:X} data_offset 0x{data_offset:X} data_size 0x{data_size:X}")
 
-                                if EXTRACT_FILES and stream_id in ENCRYPTED_STREAMS:
+                                if stream_id in ENCRYPTED_STREAMS:
                                     stream_data = ENCRYPTED_STREAMS[stream_id]
                                     print(f"\t\tFound in ENCRYPTED {stream_data}")
 
-                                    with open(stream_data["file"], "rb") as stream_file:
-                                        stream_file.seek(stream_data["base_pos"] + data_offset, 0)
+                                    if EXTRACT_FILES:
+                                        with open(stream_data["file"], "rb") as stream_file:
+                                            stream_file.seek(stream_data["base_pos"] + data_offset, 0)
 
-                                        decrypt_aligned_size = data_size
-                                        while decrypt_aligned_size % 0x10:
-                                            decrypt_aligned_size += 1
-                                        audio_data = stream_file.read(decrypt_aligned_size)
+                                            decrypt_aligned_size = data_size
+                                            while decrypt_aligned_size % 0x10:
+                                                decrypt_aligned_size += 1
+                                            audio_data = stream_file.read(decrypt_aligned_size)
 
-                                    bf = Blowfish.new(stream_data["key"], Blowfish.MODE_ECB)
-                                    audio_data = bf.decrypt(audio_data)[:data_size]
+                                        bf = Blowfish.new(stream_data["key"], Blowfish.MODE_ECB)
+                                        audio_data = bf.decrypt(audio_data)[:data_size]
 
-                                    decrypt_out_path = Path(str(file.with_suffix("")) + "_out")
-                                    #print(decrypt_out_path / f"{count}_{stream_id:x}.KA1A")
-                                    decrypt_out_path.mkdir(parents=True, exist_ok=True)
-                                    (decrypt_out_path / f"{count}_{name}.ka1a").write_bytes(audio_data)
+                                        decrypt_out_path = Path(str(file.with_suffix("")) + "_out")
+                                        #print(decrypt_out_path / f"{count}_{stream_id:x}.KA1A")
+                                        decrypt_out_path.mkdir(parents=True, exist_ok=True)
+                                        (decrypt_out_path / f"{count}_{name}.ka1a").write_bytes(audio_data)
 
                                 else:
                                     print(f"\t\tNot found in ENCRYPTED")

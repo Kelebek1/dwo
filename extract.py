@@ -77,3 +77,11 @@ with open(in_path, "rb") as f:
 
         #exit()
 
+
+
+####################
+# 9 - 74
+# 353 - 380 TB1G 
+# 381 - 428 MN1G
+# 429 - 524 FP1G collision
+# 1194 - 1384 stages

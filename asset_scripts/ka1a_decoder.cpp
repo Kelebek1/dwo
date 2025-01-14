@@ -2379,6 +2379,22 @@ int main(int argc, char* argv[]) {
 
 		KA1A hdr = *(KA1A*)fd.data();
 
+		__int64 total_output_size = 0;
+		__int64 num_frames = 0;
+		__int64 pos = sizeof(KA1A);
+		bool decode_first_frame = 0;
+
+		if (std::memcmp(hdr.magic, "KA1A", 4)) {
+			hdr.data_size = file_size;
+			hdr.num_channels = 1;
+			hdr.num_frames = 1;
+			hdr.sample_rate = 48000;
+			hdr.num_samples = 0x6A004;
+			hdr.mode = 0;
+			pos = 0;
+			decode_first_frame = true;
+		}
+
 		//hdr.num_channels = 1;
 		//hdr.num_samples = 0x3F583;
 		//hdr.mode = -2;
@@ -2404,14 +2420,8 @@ int main(int argc, char* argv[]) {
 
 		std::span a8_s(a8);
 
-		__int64 total_output_size = 0;
-		__int64 num_frames = 0;
-
 		__int64 one_iteration_output_size = 512ll * /*hdr.num_frames **/ hdr.num_channels * sizeof(float);
 		__int64 one_iteration_input_size = (__int64)frame_size * hdr.num_frames * hdr.num_channels;
-
-		__int64 pos = sizeof(KA1A);
-		pos = 0x28;
 
 		for (int channel = 0; channel < 1; channel++) {
 			//while (pos % 0x10) {
@@ -2427,7 +2437,7 @@ int main(int argc, char* argv[]) {
 				std::span<char> frame_in_s(fd.data() + pos, frame_size * hdr.num_frames * hdr.num_channels);
 				std::span<float> a4_out_s((float*)a4.data(), a4.size() / sizeof(float));
 
-				ReadFrameInHere(fd.data() + pos, hdr.num_frames, hdr.num_channels, (__int64)a4.data(), hdr.mode, 1, (__int64)a8.data(), (__int64)a9.data());
+				ReadFrameInHere(fd.data() + pos, hdr.num_frames, hdr.num_channels, (__int64)a4.data(), hdr.mode, decode_first_frame, (__int64)a8.data(), (__int64)a9.data());
 
 				for (int stream = 0; stream < hdr.num_frames; stream++) {
 					std::memcpy(outputs[stream].data() + total_output_size, a4.data() + one_iteration_output_size * stream, one_iteration_output_size);
@@ -2445,8 +2455,12 @@ int main(int argc, char* argv[]) {
 
 		for (int stream = 0; stream < hdr.num_frames; stream++) {
 			std::filesystem::path out_file_path{ orig_name_no_ext };
-			out_file_path = out_file_path.replace_filename(out_file_path.string() + "_" + std::to_string(hdr.num_channels) + "chn_strm" + std::to_string(stream));
+			//printf("1 Output to %s\n", out_file_path.string().c_str());
+			out_file_path = out_file_path.replace_filename(out_file_path.filename().string() + "_" + std::to_string(hdr.num_channels) + "chn_strm" + std::to_string(stream));
+			//printf("2 Output to %s\n", out_file_path.string().c_str());
 			out_file_path = out_file_path.replace_extension("bin");
+			//printf("3 Output to %s\n", out_file_path.string().c_str());
+			//return 0;
 
 			std::ofstream out_file{ out_file_path, std::ios::binary | std::ios::out };
 			out_file.write(outputs[stream].data(), total_output_size);

@@ -26,8 +26,8 @@ xor_last_bytes = [
 def crypt(data, type):
     if len(data) < 0x10:
         return data
-
-    key = b"1SOiLZyKB9BOW6Ivj5UAne0r6bVVCILb"
+        
+    key = b"UxxIYUYqbUDsorqpylPwzClZgvvPTZyi"
     iv = b"\xE1\xC1\xC4\x9F\x9A\x30\x19\x34\x1E\xA8\x20\xF9\x9F\xD0\x9A\x83"
     cipher = AES.new(key, AES.MODE_CBC, iv=iv)
 
@@ -45,6 +45,8 @@ def crypt(data, type):
         exit()
 
     if rem:
+        global xor_last_bytes
+
         last_data = data[len(data) - rem:]
         last_encrypted_byte = last_encrypted_block[0]
 

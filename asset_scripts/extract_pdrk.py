@@ -5,12 +5,16 @@ import zlib
 import concurrent.futures
 
 def set_output_suffix(path, magic):
+    try:
+        magic = magic.decode("utf8")
+    except Exception:
+        return path
+
     valid = False
     for c in magic:
-        if c < 0x20 or c >= 0x7F:
+        if ord(c) < 0x20 or ord(c) >= 0x7F or c in r"!\#$%&'()*+,-./\"`":
             break;
     else:
-        magic = magic.decode("utf8")
         valid = True
 
     if valid:
@@ -131,7 +135,6 @@ if __name__ == '__main__':
         out_path = in_path / "extracted"
     else:
         files = [in_path]
-        out_path = in_path.parent / "extracted"
 
     Path.mkdir(out_path, parents=True, exist_ok=True)
 
